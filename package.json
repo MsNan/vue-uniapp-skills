@@ -1,0 +1,12 @@
+{
+  "name": "vue-uniapp-skills",
+  "version": "0.1.0",
+  "description": "Vue3 + uni-app 中文 AI 编程技能包：Cursor Rules / Claude Code Skills / Trae / Codex 一键安装",
+  "bin": { "vue-uniapp-skills": "bin/cli.js" },
+  "files": ["bin", "skills"],
+  "engines": { "node": ">=16" },
+  "keywords": ["uni-app", "uniapp", "vue3", "cursor-rules", "claude-code", "skills", "trae", "ai", "mcp", "小程序"],
+  "repository": "github:MsNan/vue-uniapp-skills",
+  "author": "Theo（涛哥）",
+  "license": "MIT"
+}
