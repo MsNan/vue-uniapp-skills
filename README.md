@@ -2,6 +2,8 @@
 
 # vue-uniapp-skills
 
+[![Test](https://github.com/MsNan/vue-uniapp-skills/actions/workflows/test.yml/badge.svg)](https://github.com/MsNan/vue-uniapp-skills/actions/workflows/test.yml)
+
 **给 AI 编程助手装上“老 uni-app 开发者的经验”**
 
 一套中文的 Vue3 + uni-app 技能包，支持 **Cursor Rules / Claude Code Skills / Trae Rules / Codex（AGENTS.md）**，一行命令装进项目。
@@ -90,10 +92,14 @@ AI 会自动参考 `uniapp-permissions`：在 manifest 里声明 `getLocation`�
 ```
 skills/<技能名>/SKILL.md   # 唯一的源文件（YAML 头 + Markdown 正文）
 bin/cli.js                 # 安装器，零依赖
+bin/check.js               # 技能格式校验（name/description/正文）
+test/                      # node:test 测试（npm test）
 install.sh                 # curl 安装入口
 ```
 
-想加技能：在 `skills/` 下新建目录写 `SKILL.md`（必须包含 `name` 和 `description`，可选 `globs`），安装器会自动转换成各工具的格式。欢迎 PR 和 Issue。
+想加技能：在 `skills/` 下新建目录写 `SKILL.md`（必须包含 `name` 和 `description`，可选 `globs`），安装器会自动转换成各工具的格式（Windows 的 CRLF 换行也能识别）。提交前跑一下 `npm test`。欢迎 PR 和 Issue。
+
+重复用 `--skills` 分批安装时，`AGENTS.md` 里的技能索引会累积合并，不会覆盖之前装过的；你自己写在 `AGENTS.md` 里的内容不会被改动。
 
 ## 作者
 

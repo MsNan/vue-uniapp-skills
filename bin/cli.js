@@ -1,14 +1,16 @@
 #!/usr/bin/env node
 'use strict'
 const fs = require('fs')
+const os = require('os')
 const path = require('path')
 
 const SKILLS_DIR = path.join(__dirname, '..', 'skills')
 const TOOLS = ['claude', 'cursor', 'trae', 'codex']
-const help = `vue-uniapp-skills - 把 Vue3 + uni-app 中文技能装进你的项目
+const MARK = 'vue-uniapp-skills'
+const HELP = `vue-uniapp-skills - 把 Vue3 + uni-app 中文技能装进你的项目
 
 用法:
-  npx github:MsNan/vue-uniapp-skills [选项]
+  npx -y github:MsNan/vue-uniapp-skills [选项]
 
 选项:
   -t, --tool <名称>   claude | cursor | trae | codex | all（默认 all，可逗号分隔）
@@ -20,30 +22,54 @@ const help = `vue-uniapp-skills - 把 Vue3 + uni-app 中文技能装进你的项
   -h, --help          显示帮助
 `
 
-function parseArgs(argv) {
-  const o = { tool: 'all', skills: null, dir: process.cwd(), global: false, force: false }
+class CliError extends Error {}
+
+function parseArgs(argv, cwd = process.cwd()) {
+  const o = { tool: 'all', skills: null, dir: cwd, global: false, force: false }
   for (let i = 0; i < argv.length; i++) {
-    const a = argv[i], next = () => argv[++i]
+    const a = argv[i]
+    const next = () => {
+      const v = argv[++i]
+      if (v === undefined || v.startsWith('-')) throw new CliError(`参数 ${a} 缺少值`)
+      return v
+    }
     if (a === '-t' || a === '--tool') o.tool = next()
     else if (a === '-s' || a === '--skills') o.skills = next().split(',').map(s => s.trim()).filter(Boolean)
-    else if (a === '-d' || a === '--dir') o.dir = path.resolve(next())
+    else if (a === '-d' || a === '--dir') o.dir = path.resolve(cwd, next())
     else if (a === '-g' || a === '--global') o.global = true
     else if (a === '-f' || a === '--force') o.force = true
     else if (a === '-l' || a === '--list') o.list = true
     else if (a === '-h' || a === '--help') o.help = true
-    else { console.error('未知参数: ' + a); process.exit(1) }
+    else throw new CliError('未知参数: ' + a)
   }
   return o
 }
 
-function parse(file) {
-  const raw = fs.readFileSync(file, 'utf8')
+function unquote(v) {
+  if (/^".*"$/.test(v)) { try { return JSON.parse(v) } catch { return v.slice(1, -1) } }
+  return v
+}
+
+// YAML 双引号字符串（JSON 字符串是合法的 YAML），避免 description 里的 ": "、"#"、引号破坏 frontmatter
+const yamlStr = v => JSON.stringify(String(v))
+
+// Cursor .mdc 的 globs 用它自己的写法：不加引号、逗号分隔（Cursor 规则编辑器保存出来就是这样），
+// 所以这里只去掉多余空格，不按 YAML 加引号
+const cursorGlobs = g => (g || '').split(',').map(s => s.trim()).filter(Boolean).join(',')
+
+function parseSkill(file) {
+  const raw = fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n')
   const m = raw.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/)
   const meta = {}
   if (m) for (const line of m[1].split('\n')) {
-    const i = line.indexOf(':'); if (i > 0) meta[line.slice(0, i).trim()] = line.slice(i + 1).trim().replace(/^"(.*)"$/, '$1')
+    const i = line.indexOf(':')
+    if (i > 0) meta[line.slice(0, i).trim()] = unquote(line.slice(i + 1).trim())
   }
   return { meta, body: m ? m[2] : raw }
+}
+
+function listSkills(dir = SKILLS_DIR) {
+  return fs.readdirSync(dir).filter(n => fs.existsSync(path.join(dir, n, 'SKILL.md'))).sort()
 }
 
 function write(file, content, force, stats) {
@@ -53,51 +79,77 @@ function write(file, content, force, stats) {
   stats.written.push(file)
 }
 
-function main() {
-  const o = parseArgs(process.argv.slice(2))
-  if (o.help) return console.log(help)
-  const all = fs.readdirSync(SKILLS_DIR).filter(n => fs.existsSync(path.join(SKILLS_DIR, n, 'SKILL.md'))).sort()
-  if (o.list) {
-    for (const n of all) console.log(`  ${n.padEnd(26)} ${parse(path.join(SKILLS_DIR, n, 'SKILL.md')).meta.description}`)
-    return
-  }
+// 合并而不是覆盖：保留之前分批安装的技能条目（按技能名去重、排序）；内容不变时不写文件。返回是否写入
+function upsertAgentsBlock(file, entries) {
+  const start = `<!-- ${MARK}:start -->`, end = `<!-- ${MARK}:end -->`
+  let cur = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : ''
+  const re = new RegExp(`${start}[\\s\\S]*?${end}\\n?`)
+  const old = cur.match(re)
+  const map = new Map()
+  if (old) for (const m of old[0].matchAll(/^- `([^`]+)`.*$/gm)) map.set(m[1], m[0])
+  for (const [n, line] of entries) map.set(n, line)
+  const lines = [...map.keys()].sort().map(k => map.get(k))
+  const block = `${start}\n## Vue3 + uni-app 技能\n按任务需要先阅读对应技能文件再编码：\n${lines.join('\n')}\n${end}\n`
+  const next = old ? cur.replace(re, () => block) : (cur ? cur.replace(/\n*$/, '\n\n') : '') + block
+  if (next === cur) return false
+  fs.writeFileSync(file, next)
+  return true
+}
+
+function install(o, { skillsDir = SKILLS_DIR, home = os.homedir() } = {}) {
+  const all = listSkills(skillsDir)
   const names = o.skills || all
   const bad = names.filter(n => !all.includes(n))
-  if (bad.length) { console.error('不存在的技能: ' + bad.join(', ') + '\n用 --list 查看'); process.exit(1) }
-  const tools = o.tool === 'all' ? TOOLS : o.tool.split(',').map(s => s.trim())
+  if (bad.length) throw new CliError('不存在的技能: ' + bad.join(', ') + '\n用 --list 查看')
+  const tools = o.tool === 'all' ? TOOLS : [...new Set(o.tool.split(',').map(s => s.trim()).filter(Boolean))]
   const badT = tools.filter(t => !TOOLS.includes(t))
-  if (badT.length) { console.error('不支持的工具: ' + badT.join(', ')); process.exit(1) }
+  if (!tools.length || badT.length) throw new CliError('不支持的工具: ' + (badT.join(', ') || o.tool))
 
-  const stats = { written: [], skipped: [] }
-  const agentsSections = []
+  const stats = { written: [], skipped: [], tools, names }
+  const agentsLines = []
   for (const n of names) {
-    const { meta, body } = parse(path.join(SKILLS_DIR, n, 'SKILL.md'))
+    const { meta, body } = parseSkill(path.join(skillsDir, n, 'SKILL.md'))
     const desc = meta.description || n
+    const skillMd = `---\nname: ${n}\ndescription: ${yamlStr(desc)}\n---\n${body}`
     for (const t of tools) {
       if (t === 'claude') {
-        const base = o.global ? path.join(require('os').homedir(), '.claude', 'skills') : path.join(o.dir, '.claude', 'skills')
-        write(path.join(base, n, 'SKILL.md'), `---\nname: ${n}\ndescription: ${desc}\n---\n${body}`, o.force, stats)
+        const base = o.global ? path.join(home, '.claude', 'skills') : path.join(o.dir, '.claude', 'skills')
+        write(path.join(base, n, 'SKILL.md'), skillMd, o.force, stats)
       } else if (t === 'cursor') {
-        const fm = `---\ndescription: ${desc}\nglobs: ${meta.globs || ''}\nalwaysApply: false\n---\n`
-        write(path.join(o.dir, '.cursor', 'rules', `${n}.mdc`), fm + body, o.force, stats)
+        write(path.join(o.dir, '.cursor', 'rules', `${n}.mdc`), `---\ndescription: ${yamlStr(desc)}\nglobs:${meta.globs ? " " + cursorGlobs(meta.globs) : ""}\nalwaysApply: false\n---\n${body}`, o.force, stats)
       } else if (t === 'trae') {
         write(path.join(o.dir, '.trae', 'rules', `${n}.md`), `<!-- ${desc} -->\n${body}`, o.force, stats)
       } else if (t === 'codex') {
-        agentsSections.push(`- \`${n}\`：${desc}（详见 .agents/skills/${n}/SKILL.md）`)
-        write(path.join(o.dir, '.agents', 'skills', n, 'SKILL.md'), `---\nname: ${n}\ndescription: ${desc}\n---\n${body}`, o.force, stats)
+        write(path.join(o.dir, '.agents', 'skills', n, 'SKILL.md'), skillMd, o.force, stats)
+        agentsLines.push([n, `- \`${n}\`：${desc}（详见 .agents/skills/${n}/SKILL.md）`])
       }
     }
   }
-  if (agentsSections.length) {
+  if (agentsLines.length) {
     const f = path.join(o.dir, 'AGENTS.md')
-    const block = `<!-- vue-uniapp-skills:start -->\n## Vue3 + uni-app 技能\n按任务需要先阅读对应技能文件再编码：\n${agentsSections.join('\n')}\n<!-- vue-uniapp-skills:end -->\n`
-    let cur = fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : ''
-    const re = /<!-- vue-uniapp-skills:start -->[\s\S]*?<!-- vue-uniapp-skills:end -->\n?/
-    cur = re.test(cur) ? cur.replace(re, block) : (cur ? cur.replace(/\n*$/, '\n\n') : '') + block
-    fs.writeFileSync(f, cur); stats.written.push(f)
+    if (upsertAgentsBlock(f, agentsLines)) stats.written.push(f)
   }
-  console.log(`✅ 已写入 ${stats.written.length} 个文件（工具: ${tools.join(', ')}，技能: ${names.length} 个）`)
-  if (stats.skipped.length) console.log(`⏭️  跳过 ${stats.skipped.length} 个已存在文件，加 --force 覆盖`)
-  console.log('☕ 觉得有用欢迎 Star: https://github.com/MsNan/vue-uniapp-skills')
+  return stats
 }
-main()
+
+function main(argv = process.argv.slice(2)) {
+  try {
+    const o = parseArgs(argv)
+    if (o.help) return console.log(HELP)
+    if (o.list) {
+      for (const n of listSkills()) console.log(`  ${n.padEnd(26)} ${parseSkill(path.join(SKILLS_DIR, n, 'SKILL.md')).meta.description}`)
+      return
+    }
+    const s = install(o)
+    console.log(`✅ 已写入 ${s.written.length} 个文件（工具: ${s.tools.join(', ')}，技能: ${s.names.length} 个）`)
+    if (s.skipped.length) console.log(`⏭️  跳过 ${s.skipped.length} 个已存在文件，加 --force 覆盖`)
+    console.log('☕ 觉得有用欢迎 Star: https://github.com/MsNan/vue-uniapp-skills')
+  } catch (e) {
+    if (e instanceof CliError) { console.error(e.message); process.exitCode = 1 } else throw e
+  }
+}
+
+module.exports = { parseArgs, parseSkill, listSkills, install, upsertAgentsBlock, TOOLS, CliError }
+
+// npx 下 bin 是软链接，需比较真实路径
+if (require.main && fs.realpathSync(require.main.filename) === fs.realpathSync(__filename)) main()
