@@ -93,7 +93,7 @@ AI 会自动参考 `uniapp-permissions`：在 manifest 里声明 `getLocation`�
 skills/<技能名>/SKILL.md   # 唯一的源文件（YAML 头 + Markdown 正文）
 bin/cli.js                 # 安装器，零依赖
 bin/check.js               # 技能格式校验（name/description/正文）
-test/                      # node:test 测试（npm test）
+test/                      # node:test 测试（npm test，含 install.sh 离线端到端测试）
 install.sh                 # curl 安装入口
 ```
 
