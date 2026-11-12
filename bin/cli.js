@@ -79,18 +79,56 @@ function write(file, content, force, stats) {
   stats.written.push(file)
 }
 
+// 在 AGENTS.md 里找自己的区块：只认「整行就是标记」且不在 ``` / ~~~ 代码块里的行。
+// 标记不成对（用户删了一半）、出现多个区块、顺序颠倒时不去猜，直接报错让用户处理，避免误删用户内容
+function findAgentsBlock(text) {
+  const start = `<!-- ${MARK}:start -->`, end = `<!-- ${MARK}:end -->`
+  const lines = text.split('\n')
+  const starts = [], ends = []
+  let fence = null // 当前代码块的开头围栏，例如 ``` 或 ~~~~
+  lines.forEach((raw, i) => {
+    const line = raw.replace(/\r$/, '').trim()
+    const f = line.match(/^(`{3,}|~{3,})(.*)$/)
+    if (fence) {
+      // 关闭围栏：同一种字符、长度不短于开头、后面没有别的内容
+      if (f && f[1][0] === fence[0] && f[1].length >= fence.length && !f[2].trim()) fence = null
+      return
+    }
+    if (f) { fence = f[1]; return }
+    if (line === start) starts.push(i)
+    else if (line === end) ends.push(i)
+  })
+  if (!starts.length && !ends.length) return null
+  if (starts.length !== 1 || ends.length !== 1 || ends[0] < starts[0]) {
+    throw new CliError(`AGENTS.md 里的 ${MARK} 标记不成对或出现了多次（start ${starts.length} 个，end ${ends.length} 个），为避免覆盖你的内容没有修改它。\n请手动删掉残留的标记行（或整个旧区块）后重试`)
+  }
+  return { lines, from: starts[0], to: ends[0] }
+}
+
 // 合并而不是覆盖：保留之前分批安装的技能条目（按技能名去重、排序）；内容不变时不写文件。返回是否写入
 function upsertAgentsBlock(file, entries) {
   const start = `<!-- ${MARK}:start -->`, end = `<!-- ${MARK}:end -->`
-  let cur = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : ''
-  const re = new RegExp(`${start}[\\s\\S]*?${end}\\n?`)
-  const old = cur.match(re)
+  const cur = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : ''
+  const eol = cur.includes('\r\n') ? '\r\n' : '\n'
+  const found = findAgentsBlock(cur)
   const map = new Map()
-  if (old) for (const m of old[0].matchAll(/^- `([^`]+)`.*$/gm)) map.set(m[1], m[0])
+  if (found) for (const l of found.lines.slice(found.from + 1, found.to)) {
+    const m = l.replace(/\r$/, '').match(/^- `([^`]+)`.*$/)
+    if (m) map.set(m[1], m[0])
+  }
   for (const [n, line] of entries) map.set(n, line)
-  const lines = [...map.keys()].sort().map(k => map.get(k))
-  const block = `${start}\n## Vue3 + uni-app 技能\n按任务需要先阅读对应技能文件再编码：\n${lines.join('\n')}\n${end}\n`
-  const next = old ? cur.replace(re, () => block) : (cur ? cur.replace(/\n*$/, '\n\n') : '') + block
+  const body = [start, '## Vue3 + uni-app 技能', '按任务需要先阅读对应技能文件再编码：', ...[...map.keys()].sort().map(k => map.get(k)), end]
+  let next
+  if (found) {
+    // 按 \n 切行后 CRLF 文件每行末尾还带着 \r；新写的行沿用文件原来的换行风格
+    const cr = eol === '\r\n' ? '\r' : ''
+    const tail = found.lines[found.to].endsWith('\r') || found.to < found.lines.length - 1 ? cr : ''
+    const ls = found.lines.slice()
+    ls.splice(found.from, found.to - found.from + 1, ...body.slice(0, -1).map(l => l + cr), body[body.length - 1] + tail)
+    next = ls.join('\n')
+  } else {
+    next = (cur ? cur.replace(/(\r?\n)*$/, eol + eol) : '') + body.join(eol) + eol
+  }
   if (next === cur) return false
   fs.writeFileSync(file, next)
   return true
@@ -105,6 +143,8 @@ function install(o, { skillsDir = SKILLS_DIR, home = os.homedir() } = {}) {
   const badT = tools.filter(t => !TOOLS.includes(t))
   if (!tools.length || badT.length) throw new CliError('不支持的工具: ' + (badT.join(', ') || o.tool))
 
+  // 先检查 AGENTS.md 标记，出错时一个文件都不写
+  if (tools.includes('codex')) { const f = path.join(o.dir, 'AGENTS.md'); if (fs.existsSync(f)) findAgentsBlock(fs.readFileSync(f, 'utf8')) }
   const stats = { written: [], skipped: [], tools, names }
   const agentsLines = []
   for (const n of names) {
@@ -149,7 +189,7 @@ function main(argv = process.argv.slice(2)) {
   }
 }
 
-module.exports = { parseArgs, parseSkill, listSkills, install, upsertAgentsBlock, TOOLS, CliError }
+module.exports = { parseArgs, parseSkill, listSkills, install, upsertAgentsBlock, findAgentsBlock, TOOLS, CliError }
 
 // npx 下 bin 是软链接，需比较真实路径
 if (require.main && fs.realpathSync(require.main.filename) === fs.realpathSync(__filename)) main()

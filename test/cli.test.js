@@ -123,3 +123,47 @@ test('命令行：软链接调用（模拟 npx）可运行，-d 缺值时报错�
   }
   assert.match(execFileSync(process.execPath, [CLI, '--list'], { encoding: 'utf8' }), /uniapp-payment/)
 })
+
+test('AGENTS.md 标记不成对时报错且一个文件都不写，用户内容保留', () => {
+  const dir = tmp()
+  const f = path.join(dir, 'AGENTS.md')
+  fs.writeFileSync(f, '<!-- vue-uniapp-skills:start -->\n- `x`：旧\n\n## 我的规则\n不要改 dist\n')
+  assert.throws(() => install({ tool: 'all', skills: ['uniapp-login'], dir }), /不成对/)
+  assert.match(fs.readFileSync(f, 'utf8'), /不要改 dist/)
+  for (const d of ['.agents', '.claude', '.cursor', '.trae']) assert.ok(!fs.existsSync(path.join(dir, d)), d)
+})
+
+test('AGENTS.md 有两个区块时报错，不合并也不删内容', () => {
+  const dir = tmp()
+  const f = path.join(dir, 'AGENTS.md')
+  const blk = '<!-- vue-uniapp-skills:start -->\n- `a`：a\n<!-- vue-uniapp-skills:end -->\n'
+  const txt = blk + '\n## 中间的规则\n保留我\n\n' + blk
+  fs.writeFileSync(f, txt)
+  assert.throws(() => install({ tool: 'codex', skills: ['uniapp-login'], dir }), /不成对或出现了多次/)
+  assert.strictEqual(fs.readFileSync(f, 'utf8'), txt)
+})
+
+test('代码块里和行内提到的标记不算区块', () => {
+  const dir = tmp()
+  const f = path.join(dir, 'AGENTS.md')
+  const head = '# 项目\n别手改 `<!-- vue-uniapp-skills:start -->` 之后的内容\n```md\n<!-- vue-uniapp-skills:start -->\n示例\n<!-- vue-uniapp-skills:end -->\n```\n'
+  fs.writeFileSync(f, head)
+  install({ tool: 'codex', skills: ['uniapp-login'], dir })
+  install({ tool: 'codex', skills: ['pinia-store'], dir })
+  const txt = fs.readFileSync(f, 'utf8')
+  assert.ok(txt.startsWith(head))
+  const rest = txt.slice(head.length)
+  assert.match(rest, /pinia-store[\s\S]*uniapp-login/)
+  assert.strictEqual(rest.match(/vue-uniapp-skills:start/g).length, 1)
+})
+
+test('CRLF 的 AGENTS.md 更新后仍全是 CRLF', () => {
+  const dir = tmp()
+  const f = path.join(dir, 'AGENTS.md')
+  install({ tool: 'codex', skills: ['uniapp-login'], dir })
+  fs.writeFileSync(f, ('# 项目\n' + fs.readFileSync(f, 'utf8')).replace(/\n/g, '\r\n'))
+  install({ tool: 'codex', skills: ['pinia-store'], dir })
+  const txt = fs.readFileSync(f, 'utf8')
+  assert.strictEqual(/[^\r]\n/.test(txt), false)
+  assert.match(txt, /pinia-store[\s\S]*uniapp-login/)
+})
