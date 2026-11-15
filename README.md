@@ -47,10 +47,12 @@ npx -y github:MsNan/vue-uniapp-skills --list                     # 查看全部�
 
 | 工具 | 安装位置 | 生效方式 |
 | --- | --- | --- |
-| Cursor | `.cursor/rules/*.mdc` | 按描述 / 文件匹配自动引用 |
+| Cursor（`--tool cursor`） | `.cursor/rules/*.mdc` | 按描述 / 文件匹配自动引用 |
 | Claude Code | `.claude/skills/<name>/SKILL.md` | 按描述自动加载 Skill |
 | Trae | `.trae/rules/*.md` | 项目规则 |
 | Codex / 其他 Agent | `.agents/skills/` + `AGENTS.md` 索引 | 读取 AGENTS.md |
+
+默认 `--tool all` **不会**再写入 `.cursor/rules`。按 [Cursor 官方文档](https://cursor.com/docs/skills)，Cursor 会兼容加载 `.claude/skills/` 和 `.agents/skills/`，再写一份 Cursor 规则会让同一套内容出现两次。只需 Cursor 时请用 `--tool cursor`。若仓库里同时有 `.claude/skills` 和 `.agents/skills`，Cursor 仍可能把同一技能显示两次（Claude Code 与 Codex 各自需要自己的目录，目前无法完全避免）；主要用 Cursor 时建议只装 `--tool cursor`。以前用 `all` 装过、项目里还留着本技能包的 `.cursor/rules/*.mdc`，可以自行删掉以免重复，安装器不会自动删除。
 
 已存在的文件默认跳过，加 `--force` 覆盖；重复执行只会更新 `AGENTS.md` 中本工具自己的区块。
 

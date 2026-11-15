@@ -55,12 +55,13 @@ test('install.sh：下载 main 分支 tarball 并把参数透传给 cli，结束
   assert.deepStrictEqual(fs.readdirSync(r.tmpRoot), [], '临时目录应被 trap 清理')
 })
 
-test('install.sh：不带参数时与 npx 默认一致（四种工具全装）', { skip: !hasBash && '无 bash/tar' }, () => {
+test('install.sh：不带参数时与 npx 默认一致（Claude/Trae/Codex，不写 Cursor 规则）', { skip: !hasBash && '无 bash/tar' }, () => {
   const proj = tmp()
   const r = run([], { cwd: proj })
   assert.strictEqual(r.status, 0, r.stderr)
-  for (const p of ['.cursor/rules', '.claude/skills', '.trae/rules', '.agents/skills'])
+  for (const p of ['.claude/skills', '.trae/rules', '.agents/skills'])
     assert.ok(fs.existsSync(path.join(proj, p)), p)
+  assert.ok(!fs.existsSync(path.join(proj, '.cursor/rules')), '默认 all 不应再写 .cursor/rules')
 })
 
 test('install.sh：下载失败时非零退出、不写任何文件', { skip: !hasBash && '无 bash/tar' }, () => {
