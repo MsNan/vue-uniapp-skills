@@ -6,7 +6,7 @@
 
 **给 AI 编程助手装上“老 uni-app 开发者的经验”**
 
-一套中文的 Vue3 + uni-app 技能包，支持 **Cursor Rules / Claude Code Skills / Trae Rules / Codex（AGENTS.md）**，一行命令装进项目。
+一套中文的 Vue3 + uni-app 技能包，支持 **Cursor Skills / Claude Code Skills / Trae Rules / Codex（AGENTS.md）**，一行命令装进项目。
 
 ![license](https://img.shields.io/badge/license-MIT-green) ![skills](https://img.shields.io/badge/skills-12-blue) ![node](https://img.shields.io/badge/node-%3E%3D16-brightgreen)
 
@@ -40,6 +40,7 @@ curl -fsSL https://raw.githubusercontent.com/MsNan/vue-uniapp-skills/main/instal
 
 ```bash
 npx -y github:MsNan/vue-uniapp-skills --tool cursor
+npx -y github:MsNan/vue-uniapp-skills --tool cursor --global      # 装到 ~/.cursor/skills，所有项目可用
 npx -y github:MsNan/vue-uniapp-skills --tool claude --global      # 装到 ~/.claude/skills，所有项目可用
 npx -y github:MsNan/vue-uniapp-skills --tool trae,codex --skills uniapp-request,uniapp-login
 npx -y github:MsNan/vue-uniapp-skills --list                     # 查看全部技能
@@ -47,12 +48,12 @@ npx -y github:MsNan/vue-uniapp-skills --list                     # 查看全部�
 
 | 工具 | 安装位置 | 生效方式 |
 | --- | --- | --- |
-| Cursor（`--tool cursor`） | `.cursor/rules/*.mdc` | 按描述 / 文件匹配自动引用 |
+| Cursor（`--tool cursor`） | `.cursor/skills/<name>/SKILL.md` | 按描述自动加载；源文件 `globs` 会写成官方 `paths`，只在匹配文件时出现 |
 | Claude Code | `.claude/skills/<name>/SKILL.md` | 按描述自动加载 Skill |
 | Trae | `.trae/rules/*.md` | 项目规则 |
 | Codex / 其他 Agent | `.agents/skills/` + `AGENTS.md` 索引 | 读取 AGENTS.md |
 
-默认 `--tool all` **不会**再写入 `.cursor/rules`。按 [Cursor 官方文档](https://cursor.com/docs/skills)，Cursor 会兼容加载 `.claude/skills/` 和 `.agents/skills/`，再写一份 Cursor 规则会让同一套内容出现两次。只需 Cursor 时请用 `--tool cursor`。若仓库里同时有 `.claude/skills` 和 `.agents/skills`，Cursor 仍可能把同一技能显示两次（Claude Code 与 Codex 各自需要自己的目录，目前无法完全避免）；主要用 Cursor 时建议只装 `--tool cursor`。以前用 `all` 装过、项目里还留着本技能包的 `.cursor/rules/*.mdc`，可以自行删掉以免重复，安装器不会自动删除。
+默认 `--tool all` **不会**再写入 `.cursor/skills`。按 [Cursor 官方文档](https://cursor.com/docs/skills)，Cursor 会兼容加载 `.claude/skills/` 和 `.agents/skills/`，再写一份 Cursor 技能会让同一套内容出现两次。只需 Cursor 时请用 `--tool cursor`（写入官方 `.cursor/skills/<name>/SKILL.md`；加 `--global` 则装到 `~/.cursor/skills`）。若仓库里同时有 `.claude/skills` 和 `.agents/skills`，Cursor 仍可能把同一技能显示两次（Claude Code 与 Codex 各自需要自己的目录，目前无法完全避免）；主要用 Cursor 时建议只装 `--tool cursor`。以前用本安装器写过 `.cursor/rules/*.mdc` 的，可以自行删掉以免和技能重复，安装器不会自动删除。
 
 已存在的文件默认跳过，加 `--force` 覆盖；重复执行只会更新 `AGENTS.md` 中本工具自己的区块。
 
@@ -99,7 +100,7 @@ test/                      # node:test 测试（npm test，含 install.sh 离线
 install.sh                 # curl 安装入口
 ```
 
-想加技能：在 `skills/` 下新建目录写 `SKILL.md`（必须包含 `name` 和 `description`，可选 `globs`），安装器会自动转换成各工具的格式（Windows 的 CRLF 换行也能识别）。提交前跑一下 `npm test`。欢迎 PR 和 Issue。
+想加技能：在 `skills/` 下新建目录写 `SKILL.md`（必须包含 `name` 和 `description`，可选 `globs`）。安装器会转换成各工具的格式：Cursor 把 `globs` 写成官方 `paths` 列表，没有 `globs` 则不写该字段（Windows 的 CRLF 换行也能识别）。提交前跑一下 `npm test`。欢迎 PR 和 Issue。
 
 重复用 `--skills` 分批安装时，`AGENTS.md` 里的技能索引会累积合并，不会覆盖之前装过的；你自己写在 `AGENTS.md` 里的内容不会被改动。如果本工具的区块标记被删了一半或出现多次，安装会直接报错退出、一个文件都不写，请手动清理残留标记后重试（代码块里举例写的标记不受影响）。
 

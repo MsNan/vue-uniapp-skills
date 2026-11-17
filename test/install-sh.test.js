@@ -50,7 +50,7 @@ test('install.sh：下载 main 分支 tarball 并把参数透传给 cli，结束
   const r = run(['--tool', 'cursor', '--skills', 'uniapp-login'], { cwd: proj })
   assert.strictEqual(r.status, 0, r.stderr)
   assert.match(r.log, /codeload\.github\.com\/MsNan\/vue-uniapp-skills\/tar\.gz\/refs\/heads\/main/)
-  assert.ok(fs.existsSync(path.join(proj, '.cursor/rules/uniapp-login.mdc')))
+  assert.ok(fs.existsSync(path.join(proj, '.cursor/skills/uniapp-login/SKILL.md')))
   assert.ok(!fs.existsSync(path.join(proj, '.claude')), '只装 cursor 时不应写 claude 目录')
   assert.deepStrictEqual(fs.readdirSync(r.tmpRoot), [], '临时目录应被 trap 清理')
 })
@@ -61,7 +61,7 @@ test('install.sh：不带参数时与 npx 默认一致（Claude/Trae/Codex，不
   assert.strictEqual(r.status, 0, r.stderr)
   for (const p of ['.claude/skills', '.trae/rules', '.agents/skills'])
     assert.ok(fs.existsSync(path.join(proj, p)), p)
-  assert.ok(!fs.existsSync(path.join(proj, '.cursor/rules')), '默认 all 不应再写 .cursor/rules')
+  assert.ok(!fs.existsSync(path.join(proj, '.cursor')), '默认 all 不应再写 .cursor/skills 或 .cursor/rules')
 })
 
 test('install.sh：下载失败时非零退出、不写任何文件', { skip: !hasBash && '无 bash/tar' }, () => {

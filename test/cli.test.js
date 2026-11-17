@@ -38,13 +38,15 @@ test('全量安装写入 Claude/Trae/Codex，不再重复写 Cursor 规则', () 
   assert.ok(!fs.existsSync(path.join(dir, '.cursor/skills')))
 })
 
-test('Cursor 规则：globs 保持 Cursor 原生写法（不加引号、逗号分隔），没有 globs 时留空', () => {
+test('Cursor 技能写入 .cursor/skills，globs 转为官方 paths 列表；没有 globs 时不写 paths', () => {
   const dir = tmp()
   install({ tool: 'cursor', skills: ['vue3-composition', 'uniapp-login'], dir })
-  const mdc = fs.readFileSync(path.join(dir, '.cursor/rules/vue3-composition.mdc'), 'utf8')
-  assert.match(mdc, /^---\ndescription: ".+"\nglobs: \*\*\/\*\.vue,\*\*\/composables\/\*\*\/\*\.ts\nalwaysApply: false\n---\n/)
-  const login = fs.readFileSync(path.join(dir, '.cursor/rules/uniapp-login.mdc'), 'utf8')
-  assert.match(login, /\nglobs:\nalwaysApply: false\n/)
+  const skill = fs.readFileSync(path.join(dir, '.cursor/skills/vue3-composition/SKILL.md'), 'utf8')
+  assert.match(skill, /^---\nname: vue3-composition\ndescription: ".+"\npaths:\n  - "\*\*\/\*\.vue"\n  - "\*\*\/composables\/\*\*\/\*\.ts"\n---\n/)
+  const login = fs.readFileSync(path.join(dir, '.cursor/skills/uniapp-login/SKILL.md'), 'utf8')
+  assert.match(login, /^---\nname: uniapp-login\ndescription: ".+"\n---\n/)
+  assert.doesNotMatch(login, /^paths:/m)
+  assert.ok(!fs.existsSync(path.join(dir, '.cursor/rules')))
 })
 
 test('已存在文件默认跳过，--force 覆盖', () => {
@@ -100,7 +102,7 @@ test('description 以 YAML 双引号字符串写出，含冒号、引号、# 也
   // 分开装：同时指定 cursor+claude 时不再写 .cursor/rules（Cursor 会读 .claude/skills）
   install({ tool: 'claude', skills: null, dir }, { skillsDir: src })
   install({ tool: 'cursor', skills: null, dir }, { skillsDir: src })
-  for (const f of ['.claude/skills/demo-skill/SKILL.md', '.cursor/rules/demo-skill.mdc']) {
+  for (const f of ['.claude/skills/demo-skill/SKILL.md', '.cursor/skills/demo-skill/SKILL.md']) {
     const line = fs.readFileSync(path.join(dir, f), 'utf8').split('\n').find(l => l.startsWith('description:'))
     assert.strictEqual(JSON.parse(line.slice('description:'.length).trim()), '用法: 写 <script setup lang="ts"> #1 时使用')
   }
@@ -174,23 +176,24 @@ test('CRLF 的 AGENTS.md 更新后仍全是 CRLF', () => {
   assert.match(txt, /pinia-store[\s\S]*uniapp-login/)
 })
 
-test('同时装 Cursor 和 Claude/Codex 时不写 .cursor/rules；只和 Trae 一起装时仍写入', () => {
+test('同时装 Cursor 和 Claude/Codex 时不写 .cursor/skills；只和 Trae 一起装时仍写入', () => {
   const dir1 = tmp()
   const s1 = install({ tool: 'cursor,claude', skills: ['uniapp-login'], dir: dir1 })
   assert.strictEqual(s1.cursorCompatSkip, true)
   assert.ok(fs.existsSync(path.join(dir1, '.claude/skills/uniapp-login/SKILL.md')))
-  assert.ok(!fs.existsSync(path.join(dir1, '.cursor/rules')))
+  assert.ok(!fs.existsSync(path.join(dir1, '.cursor')))
 
   const dir2 = tmp()
   const s2 = install({ tool: 'cursor,codex', skills: ['uniapp-login'], dir: dir2 })
   assert.strictEqual(s2.cursorCompatSkip, true)
   assert.ok(fs.existsSync(path.join(dir2, '.agents/skills/uniapp-login/SKILL.md')))
-  assert.ok(!fs.existsSync(path.join(dir2, '.cursor/rules')))
+  assert.ok(!fs.existsSync(path.join(dir2, '.cursor')))
 
   const dir3 = tmp()
   const s3 = install({ tool: 'cursor,trae', skills: ['uniapp-login'], dir: dir3 })
   assert.notStrictEqual(s3.cursorCompatSkip, true)
-  assert.ok(fs.existsSync(path.join(dir3, '.cursor/rules/uniapp-login.mdc')))
+  assert.ok(fs.existsSync(path.join(dir3, '.cursor/skills/uniapp-login/SKILL.md')))
+  assert.ok(!fs.existsSync(path.join(dir3, '.cursor/rules')))
   assert.ok(fs.existsSync(path.join(dir3, '.trae/rules/uniapp-login.md')))
 })
 
@@ -204,11 +207,32 @@ test('同时装 Claude/Codex 时若已有旧的 .cursor/rules，列入 staleCurs
   assert.strictEqual(fs.readFileSync(stale, 'utf8'), 'old rule')
 })
 
-test('命令行 --tool all 会提示未写入 Cursor 规则', () => {
+test('命令行 --tool all 会提示未写入 Cursor 技能', () => {
   const dir = tmp()
   const out = execFileSync(process.execPath, [CLI, '-t', 'all', '-s', 'uniapp-login', '-d', dir], { encoding: 'utf8' })
-  assert.match(out, /未写入 \.cursor\/rules/)
+  assert.match(out, /未写入 \.cursor\/skills/)
   assert.match(out, /cursor\.com\/docs\/skills/)
-  assert.ok(!fs.existsSync(path.join(dir, '.cursor/rules')))
+  assert.ok(!fs.existsSync(path.join(dir, '.cursor')))
   assert.ok(fs.existsSync(path.join(dir, '.claude/skills/uniapp-login/SKILL.md')))
+})
+
+test('--global 把 Cursor 技能装到 ~/.cursor/skills，带上 paths，不写项目目录和旧规则格式', () => {
+  const dir = tmp(), home = tmp()
+  install({ tool: 'cursor', skills: ['vue3-composition'], dir, global: true }, { home })
+  const f = path.join(home, '.cursor/skills/vue3-composition/SKILL.md')
+  assert.ok(fs.existsSync(f))
+  assert.match(fs.readFileSync(f, 'utf8'), /\npaths:\n  - "\*\*\/\*\.vue"\n/)
+  assert.ok(!fs.existsSync(path.join(dir, '.cursor')))
+  assert.ok(!fs.existsSync(path.join(home, '.cursor/rules')))
+})
+
+test('只装 Cursor 时若已有旧的 .cursor/rules，列入 staleCursorRules 但不自动删除', () => {
+  const dir = tmp()
+  const stale = path.join(dir, '.cursor/rules/uniapp-login.mdc')
+  fs.mkdirSync(path.dirname(stale), { recursive: true })
+  fs.writeFileSync(stale, 'old rule')
+  const s = install({ tool: 'cursor', skills: ['uniapp-login'], dir })
+  assert.ok(fs.existsSync(path.join(dir, '.cursor/skills/uniapp-login/SKILL.md')))
+  assert.deepStrictEqual(s.staleCursorRules, [stale])
+  assert.strictEqual(fs.readFileSync(stale, 'utf8'), 'old rule')
 })
