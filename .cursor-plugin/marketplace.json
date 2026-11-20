@@ -1,0 +1,16 @@
+{
+  "name": "vue-uniapp-skills",
+  "owner": {
+    "name": "MsNan"
+  },
+  "metadata": {
+    "description": "Vue3 + uni-app 中文 AI 编程技能包"
+  },
+  "plugins": [
+    {
+      "name": "vue-uniapp-skills",
+      "source": ".",
+      "description": "Vue3 + uni-app 中文 AI 编程技能包：跨端、请求封装、登录支付、分包与审核自查"
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "name": "vue-uniapp-skills",
+  "displayName": "Vue3 + uni-app 技能包",
+  "version": "0.1.1",
+  "description": "Vue3 + uni-app 中文 AI 编程技能包：跨端、请求封装、登录支付、分包与审核自查",
+  "author": {
+    "name": "Theo（涛哥）"
+  },
+  "homepage": "https://github.com/MsNan/vue-uniapp-skills",
+  "repository": "https://github.com/MsNan/vue-uniapp-skills",
+  "license": "MIT",
+  "keywords": [
+    "uni-app",
+    "uniapp",
+    "vue3",
+    "skills",
+    "miniprogram"
+  ]
+}

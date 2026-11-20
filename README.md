@@ -57,6 +57,14 @@ npx -y github:MsNan/vue-uniapp-skills --list                     # 查看全部�
 
 已存在的文件默认跳过，加 `--force` 覆盖；重复执行只会更新 `AGENTS.md` 中本工具自己的区块。
 
+### 用 Cursor 插件导入（可选）
+
+对照 [Cursor 官方插件文档](https://cursor.com/docs/reference/plugins)，仓库根目录提供了 `.cursor-plugin/plugin.json` 和 `.cursor-plugin/marketplace.json`。这是单插件仓库，`source` 为 `.`，技能仍放在 `skills/`，上面的 `npx` 安装器路径不变。
+
+- **推荐**：继续用 `npx` 安装器，同时支持 Cursor / Claude Code / Trae / Codex。
+- **Teams / Enterprise**：Dashboard → Plugins & MCPs → Add Marketplace → Import from Repo，粘贴 `https://github.com/MsNan/vue-uniapp-skills`，再在 Customize 里安装。
+- 尚未提交到官方 Cursor Marketplace（提交需要官方审核，需要的话可以再做）。
+
 ## 技能列表
 
 | 技能 | 内容 |
@@ -93,11 +101,13 @@ AI 会自动参考 `uniapp-permissions`：在 manifest 里声明 `getLocation`�
 ## 目录结构
 
 ```
-skills/<技能名>/SKILL.md   # 唯一的源文件（YAML 头 + Markdown 正文）
-bin/cli.js                 # 安装器，零依赖
-bin/check.js               # 技能格式校验（name/description/正文）
-test/                      # node:test 测试（npm test，含 install.sh 离线端到端测试）
-install.sh                 # curl 安装入口
+skills/<技能名>/SKILL.md          # 唯一的源文件（YAML 头 + Markdown 正文）
+.cursor-plugin/plugin.json       # Cursor 插件清单（默认发现 skills/）
+.cursor-plugin/marketplace.json  # 单插件市场清单，source 为 "."
+bin/cli.js                       # 安装器，零依赖
+bin/check.js                     # 技能格式 + 插件清单校验
+test/                            # node:test 测试（npm test，含 install.sh 离线端到端测试）
+install.sh                       # curl 安装入口
 ```
 
 想加技能：在 `skills/` 下新建目录写 `SKILL.md`（必须包含 `name` 和 `description`，可选 `globs`）。安装器会转换成各工具的格式：Cursor 把 `globs` 写成官方 `paths` 列表，没有 `globs` 则不写该字段（Windows 的 CRLF 换行也能识别）。提交前跑一下 `npm test`。欢迎 PR 和 Issue。

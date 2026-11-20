@@ -5,7 +5,11 @@
   "bin": {
     "vue-uniapp-skills": "bin/cli.js"
   },
-  "files": ["bin", "skills"],
+  "files": [
+    "bin",
+    "skills",
+    ".cursor-plugin"
+  ],
   "scripts": {
     "check": "node bin/check.js",
     "test": "node bin/check.js && node --test"
@@ -13,7 +17,20 @@
   "engines": {
     "node": ">=16"
   },
-  "keywords": ["uni-app", "uniapp", "vue3", "cursor-skills", "cursor-rules", "claude-code", "skills", "trae", "ai", "mcp", "小程序"],
+  "keywords": [
+    "uni-app",
+    "uniapp",
+    "vue3",
+    "cursor-skills",
+    "cursor-rules",
+    "claude-code",
+    "skills",
+    "trae",
+    "ai",
+    "mcp",
+    "小程序",
+    "cursor-plugin"
+  ],
   "repository": "github:MsNan/vue-uniapp-skills",
   "author": "Theo（涛哥）",
   "license": "MIT"
