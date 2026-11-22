@@ -59,7 +59,7 @@ test('install.sh：不带参数时与 npx 默认一致（Claude/Trae/Codex，不
   const proj = tmp()
   const r = run([], { cwd: proj })
   assert.strictEqual(r.status, 0, r.stderr)
-  for (const p of ['.claude/skills', '.trae/rules', '.agents/skills'])
+  for (const p of ['.claude/skills', '.trae/skills', '.agents/skills'])
     assert.ok(fs.existsSync(path.join(proj, p)), p)
   assert.ok(!fs.existsSync(path.join(proj, '.cursor')), '默认 all 不应再写 .cursor/skills 或 .cursor/rules')
 })
